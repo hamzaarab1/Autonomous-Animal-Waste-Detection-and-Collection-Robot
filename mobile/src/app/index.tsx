@@ -4,10 +4,13 @@ import type { ComponentProps, ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { YardSentryMark, YardSentryWordmark } from '@/components/yardsentry-logo';
 import { Button } from '@/components/button';
+import { Grid } from '@/components/grid';
 import { YardIllustration } from '@/components/yard-illustration';
-import { Colors, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { YardSentryMark, YardSentryWordmark } from '@/components/yardsentry-logo';
+import { Colors, PageMaxWidth, Radius, Spacing } from '@/constants/theme';
+import { useLayout } from '@/hooks/use-layout';
+import { useAuth } from '@/lib/auth-context';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -73,63 +76,94 @@ const CONTROLS: { icon: IconName; label: string }[] = [
 ];
 
 export default function HomeScreen() {
+  const { user } = useAuth();
+  const { width, gutter, isTablet, isDesktop } = useLayout();
+  const contentWidth = Math.min(width, PageMaxWidth) - gutter * 2;
+  const illustrationWidth = isTablet ? Math.min(560, contentWidth * 0.46) : Math.min(contentWidth, 420);
+  const primaryAction = user
+    ? { title: 'Go to dashboard', href: '/dashboard' as const }
+    : { title: 'Create account', href: '/login?mode=signup' as const };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.container}>
-          {/* Top bar */}
+        {/* Top bar spans the full window */}
+        <View style={[styles.topBarWrap, { paddingHorizontal: gutter }]}>
           <View style={styles.topBar}>
-            <YardSentryMark width={24} />
-            <Button title="Log in" variant="ghost" onPress={() => router.push('/login')} />
+            {isTablet ? <YardSentryWordmark width={150} /> : <YardSentryMark width={26} />}
+            <Button
+              title={user ? 'Go to dashboard' : 'Log in'}
+              variant="ghost"
+              onPress={() => router.push(user ? '/dashboard' : '/login')}
+            />
           </View>
+        </View>
 
-          {/* Hero */}
-          <View style={styles.hero}>
-            <YardSentryWordmark width={250} />
-            <Text style={styles.expansion}>The autonomous yard-cleaning robot</Text>
-            <Text style={styles.headline}>A cleaner yard,{'\n'}without lifting a finger.</Text>
-            <Text style={styles.lead}>
-              YardSentry is an outdoor robot that finds and picks up animal waste in your backyard or at
-              the cottage, then stores it onboard so you don’t have to.
-            </Text>
-            <View style={styles.heroActions}>
-              <Button title="Get started" onPress={() => router.push('/login?mode=signup')} />
-              <Button title="I already have an account" variant="secondary" onPress={() => router.push('/login')} />
+        <View style={[styles.container, { paddingHorizontal: gutter }]}>
+          {/* Hero: text beside the illustration on wider screens, stacked on phones */}
+          <View style={[styles.hero, isTablet && styles.heroRow]}>
+            <View style={isTablet ? styles.flex : undefined}>
+              {!isTablet && <YardSentryWordmark width={240} />}
+              <Text style={styles.expansion}>The autonomous yard-cleaning robot</Text>
+              <Text style={[styles.headline, isTablet && styles.headlineTablet, isDesktop && styles.headlineDesktop]}>
+                A cleaner yard,{'\n'}without lifting a finger.
+              </Text>
+              <Text style={[styles.lead, isDesktop && styles.leadDesktop]}>
+                YardSentry is an outdoor robot that finds and picks up animal waste in your backyard or at
+                the cottage, then stores it onboard so you don’t have to.
+              </Text>
+              <View style={[styles.heroActions, isTablet && styles.heroActionsRow]}>
+                {user ? (
+                  <Button title="Go to dashboard" onPress={() => router.push('/dashboard')} />
+                ) : (
+                  <>
+                    <Button title="Get started" onPress={() => router.push('/login?mode=signup')} />
+                    <Button
+                      title="I already have an account"
+                      variant="secondary"
+                      onPress={() => router.push('/login')}
+                    />
+                  </>
+                )}
+              </View>
             </View>
-          </View>
-
-          <View style={styles.illustration}>
-            <YardIllustration width={Math.min(MaxContentWidth - Spacing.lg * 2, 340)} />
+            <View style={styles.illustration}>
+              <YardIllustration width={illustrationWidth} />
+            </View>
           </View>
 
           {/* How it works */}
           <Section eyebrow="How it works" title="Set it up once. Then let it work.">
-            {STEPS.map((step, i) => (
-              <View key={step.title} style={styles.step}>
-                <View style={styles.stepIndex}>
-                  <Text style={styles.stepIndexText}>{i + 1}</Text>
+            <Grid columns={isDesktop ? 4 : isTablet ? 2 : 1}>
+              {STEPS.map((step, i) => (
+                <View key={step.title} style={[styles.step, isTablet && styles.tile]}>
+                  <View style={styles.stepIndex}>
+                    <Text style={styles.stepIndexText}>{i + 1}</Text>
+                  </View>
+                  <View style={isTablet ? undefined : styles.flex}>
+                    <Text style={styles.cardTitle}>{step.title}</Text>
+                    <Text style={styles.body}>{step.body}</Text>
+                  </View>
                 </View>
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>{step.title}</Text>
-                  <Text style={styles.body}>{step.body}</Text>
-                </View>
-              </View>
-            ))}
+              ))}
+            </Grid>
           </Section>
 
           {/* Features */}
           <Section eyebrow="Why YardSentry" title="Built for real yards.">
-            {FEATURES.map((f) => (
-              <View key={f.title} style={styles.featureCard}>
-                <View style={styles.featureIcon}>
-                  <Ionicons name={f.icon} size={22} color={Colors.primary} />
+            <Grid columns={isDesktop ? 3 : isTablet ? 2 : 1}>
+              {FEATURES.map((f) => (
+                <View key={f.title} style={[styles.featureCard, isTablet && styles.tile]}>
+                  <View style={styles.featureIcon}>
+                    <Ionicons name={f.icon} size={22} color={Colors.primary} />
+                  </View>
+                  <View style={isTablet ? undefined : styles.flex}>
+                    <Text style={styles.cardTitle}>{f.title}</Text>
+                    <Text style={styles.body}>{f.body}</Text>
+                  </View>
                 </View>
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>{f.title}</Text>
-                  <Text style={styles.body}>{f.body}</Text>
-                </View>
-              </View>
-            ))}
+              ))}
+            </Grid>
           </Section>
 
           {/* Controls */}
@@ -145,14 +179,16 @@ export default function HomeScreen() {
           </Section>
 
           {/* Closing CTA */}
-          <View style={styles.cta}>
-            <YardSentryMark width={34} tone="dark" />
-            <Text style={styles.ctaTitle}>Ready to meet your robot?</Text>
-            <Text style={styles.ctaBody}>
-              Create an account, then pair your YardSentry using the QR code in the box.
-            </Text>
-            <View style={styles.ctaButton}>
-              <Button title="Create account" onPress={() => router.push('/login?mode=signup')} />
+          <View style={[styles.cta, isTablet && styles.ctaRow]}>
+            <View style={isTablet ? styles.flex : undefined}>
+              <YardSentryMark width={34} tone="dark" />
+              <Text style={styles.ctaTitle}>Ready to meet your robot?</Text>
+              <Text style={styles.ctaBody}>
+                Create an account, then pair your YardSentry using the QR code in the box.
+              </Text>
+            </View>
+            <View style={[styles.ctaButton, isTablet && styles.ctaButtonRow]}>
+              <Button title={primaryAction.title} onPress={() => router.push(primaryAction.href)} />
             </View>
           </View>
 
@@ -181,27 +217,40 @@ const styles = StyleSheet.create({
   scroll: {
     paddingBottom: Spacing.xxl,
   },
+  topBarWrap: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  topBar: {
+    width: '100%',
+    maxWidth: PageMaxWidth,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.sm,
+  },
   container: {
     width: '100%',
-    maxWidth: MaxContentWidth,
+    maxWidth: PageMaxWidth,
     alignSelf: 'center',
-    paddingHorizontal: Spacing.lg,
   },
   flex: {
     flex: 1,
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.sm,
-  },
   hero: {
     paddingTop: Spacing.xl,
   },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xxl,
+    paddingTop: Spacing.xxl + Spacing.lg,
+    paddingBottom: Spacing.lg,
+  },
   expansion: {
     marginTop: Spacing.md,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
@@ -215,22 +264,41 @@ const styles = StyleSheet.create({
     color: Colors.forest,
     letterSpacing: -0.5,
   },
+  headlineTablet: {
+    fontSize: 42,
+    lineHeight: 50,
+  },
+  headlineDesktop: {
+    fontSize: 56,
+    lineHeight: 64,
+    letterSpacing: -1,
+  },
   lead: {
     marginTop: Spacing.md,
+    maxWidth: 560,
     fontSize: 17,
     lineHeight: 25,
     color: Colors.textMuted,
   },
+  leadDesktop: {
+    fontSize: 19,
+    lineHeight: 29,
+  },
   heroActions: {
     marginTop: Spacing.lg,
     gap: Spacing.sm + 4,
+  },
+  heroActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: Spacing.xl,
   },
   illustration: {
     marginTop: Spacing.xl,
     alignItems: 'center',
   },
   section: {
-    marginTop: Spacing.xxl,
+    marginTop: Spacing.xxl + Spacing.md,
   },
   eyebrow: {
     fontSize: 13,
@@ -241,19 +309,28 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     marginTop: Spacing.xs + 2,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: '800',
     color: Colors.forest,
     letterSpacing: -0.3,
   },
   sectionBody: {
     marginTop: Spacing.lg,
-    gap: Spacing.md,
   },
   step: {
     flexDirection: 'row',
     gap: Spacing.md,
+  },
+  /** Vertical card used for steps and features once they sit in a multi-column grid. */
+  tile: {
+    flexDirection: 'column',
+    height: '100%',
+    padding: Spacing.lg - 4,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   stepIndex: {
     width: 32,
@@ -316,11 +393,17 @@ const styles = StyleSheet.create({
     color: Colors.forest,
   },
   cta: {
-    marginTop: Spacing.xxl,
+    marginTop: Spacing.xxl + Spacing.md,
     padding: Spacing.lg,
     borderRadius: Radius.lg,
     backgroundColor: Colors.forest,
     alignItems: 'flex-start',
+  },
+  ctaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xl,
+    padding: Spacing.xl + Spacing.sm,
   },
   ctaTitle: {
     marginTop: Spacing.md,
@@ -337,6 +420,11 @@ const styles = StyleSheet.create({
   ctaButton: {
     marginTop: Spacing.lg,
     alignSelf: 'stretch',
+  },
+  ctaButtonRow: {
+    marginTop: 0,
+    alignSelf: 'center',
+    minWidth: 220,
   },
   footer: {
     marginTop: Spacing.xl,

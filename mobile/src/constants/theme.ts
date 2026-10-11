@@ -41,3 +41,12 @@ export const Radius = {
 } as const;
 
 export const MaxContentWidth = 560;
+
+/** Widest a full page's content grows on large screens before it centers. */
+export const PageMaxWidth = 1280;
+
+/** Window widths (px) where layouts switch. Below `tablet` is treated as a phone. */
+export const Breakpoints = {
+  tablet: 700,
+  desktop: 1024,
+} as const;

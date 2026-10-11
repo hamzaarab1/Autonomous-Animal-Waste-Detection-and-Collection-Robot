@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, type PressableProps } from 'react-native';
 
 import { Colors, Radius, Spacing } from '@/constants/theme';
@@ -6,9 +7,11 @@ type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   title: string;
   variant?: 'primary' | 'secondary' | 'ghost';
   loading?: boolean;
+  /** Rendered before the title, e.g. a provider logo. */
+  icon?: ReactNode;
 };
 
-export function Button({ title, variant = 'primary', loading = false, disabled, ...rest }: ButtonProps) {
+export function Button({ title, variant = 'primary', loading = false, icon, disabled, ...rest }: ButtonProps) {
   const isDisabled = disabled || loading;
 
   return (
@@ -26,7 +29,10 @@ export function Button({ title, variant = 'primary', loading = false, disabled, 
       {loading ? (
         <ActivityIndicator color={variant === 'primary' ? Colors.white : Colors.primary} />
       ) : (
-        <Text style={[styles.label, labelStyles[variant]]}>{title}</Text>
+        <>
+          {icon}
+          <Text style={[styles.label, labelStyles[variant]]}>{title}</Text>
+        </>
       )}
     </Pressable>
   );
@@ -37,6 +43,8 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: Spacing.lg,
     borderRadius: Radius.pill,
+    flexDirection: 'row',
+    gap: Spacing.sm + 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

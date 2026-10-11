@@ -1,8 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,9 +14,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { YardSentryMark } from '@/components/yardsentry-logo';
+import { YardIllustration } from '@/components/yard-illustration';
+import { YardSentryMark, YardSentryWordmark } from '@/components/yardsentry-logo';
 import { Button } from '@/components/button';
 import { Colors, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useLayout } from '@/hooks/use-layout';
+import { useAuth } from '@/lib/auth-context';
+import { signInWithGoogle } from '@/lib/google-sign-in';
+import { notify } from '@/lib/notify';
 
 type Mode = 'login' | 'signup';
 
@@ -25,6 +29,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 
 export default function LoginScreen() {
+  const { user } = useAuth();
+  const { isDesktop } = useLayout();
   const params = useLocalSearchParams<{ mode?: string }>();
   const [mode, setMode] = useState<Mode>(params.mode === 'signup' ? 'signup' : 'login');
   const [name, setName] = useState('');
@@ -33,6 +39,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
 
   // Follow the ?mode= param when the screen is reached via a link to a specific mode.
   useEffect(() => {
@@ -65,17 +72,36 @@ export default function LoginScreen() {
     // TODO: replace with the real auth call once the robot/account API is defined.
     await new Promise((resolve) => setTimeout(resolve, 600));
     setSubmitting(false);
-    Alert.alert(
+    notify(
       isSignup ? 'Account created' : 'Signed in',
       'Authentication is not connected yet. This screen is a UI preview.',
     );
   }
 
+  async function handleGoogle() {
+    setError(null);
+    setGoogleSubmitting(true);
+    try {
+      // On success the auth state changes and the <Redirect> below sends the user to the dashboard.
+      // A null result means they backed out of the Google picker.
+      await signInWithGoogle();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Google sign-in failed. Please try again.');
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
+
+  if (user) return <Redirect href="/dashboard" />;
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.safe, isDesktop && styles.row]} edges={['top', 'bottom']}>
+      {isDesktop && <BrandPanel />}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={styles.container}>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, isDesktop && styles.scrollCentered]}
+          keyboardShouldPersistTaps="handled">
+          <View style={[styles.container, isDesktop && styles.containerDesktop]}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Back"
@@ -148,7 +174,7 @@ export default function LoginScreen() {
                 <Pressable
                   style={styles.forgot}
                   hitSlop={8}
-                  onPress={() => Alert.alert('Reset password', 'Password reset is coming soon.')}>
+                  onPress={() => notify('Reset password', 'Password reset is coming soon.')}>
                   <Text style={styles.link}>Forgot password?</Text>
                 </Pressable>
               )}
@@ -164,9 +190,25 @@ export default function LoginScreen() {
                 <Button
                   title={isSignup ? 'Create account' : 'Log in'}
                   loading={submitting}
+                  disabled={googleSubmitting}
                   onPress={handleSubmit}
                 />
               </View>
+
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Button
+                title="Continue with Google"
+                variant="secondary"
+                icon={<Ionicons name="logo-google" size={20} color={Colors.forest} />}
+                loading={googleSubmitting}
+                disabled={submitting}
+                onPress={handleGoogle}
+              />
             </View>
 
             <View style={styles.switchRow}>
@@ -188,6 +230,22 @@ export default function LoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/** Left half of the desktop login: brand, pitch, and the yard illustration. */
+function BrandPanel() {
+  return (
+    <View style={styles.brandPanel}>
+      <YardSentryWordmark width={200} tone="dark" />
+      <View style={styles.brandBody}>
+        <Text style={styles.brandHeadline}>A cleaner yard,{'\n'}without lifting a finger.</Text>
+        <Text style={styles.brandLead}>
+          Check on your robots, start a clean, set a schedule, and review what they found, all in one place.
+        </Text>
+      </View>
+      <YardIllustration width={420} />
+    </View>
   );
 }
 
@@ -216,6 +274,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  row: {
+    flexDirection: 'row',
+  },
   flex: {
     flex: 1,
   },
@@ -223,11 +284,42 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: Spacing.xl,
   },
+  scrollCentered: {
+    justifyContent: 'center',
+    paddingVertical: Spacing.xl,
+  },
   container: {
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: Spacing.lg,
+  },
+  containerDesktop: {
+    maxWidth: 440,
+  },
+  brandPanel: {
+    flex: 1,
+    maxWidth: 720,
+    backgroundColor: Colors.forest,
+    padding: Spacing.xxl,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  brandBody: {
+    maxWidth: 480,
+  },
+  brandHeadline: {
+    fontSize: 44,
+    lineHeight: 52,
+    fontWeight: '800',
+    color: Colors.white,
+    letterSpacing: -0.6,
+  },
+  brandLead: {
+    marginTop: Spacing.md,
+    fontSize: 18,
+    lineHeight: 27,
+    color: Colors.mintStrong,
   },
   back: {
     marginTop: Spacing.sm,
@@ -314,6 +406,20 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: Spacing.sm,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm + 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    fontSize: 14,
+    color: Colors.textMuted,
   },
   switchRow: {
     marginTop: Spacing.lg,
